@@ -88,7 +88,7 @@ export class ScreeningError extends Error {
   }
 }
 
-function getClient(): GoogleGenAI {
+export function getClient(): GoogleGenAI {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new ScreeningError("GEMINI_API_KEY is not configured on the server.", 500);
   return new GoogleGenAI({ apiKey });
@@ -118,7 +118,12 @@ export async function screenResume(resume: ResumeInput, role: Role, fileName: st
   return normalise(parseJson(raw), role, fileName);
 }
 
-async function generateWithRetry(ai: GoogleGenAI, systemInstruction: string, parts: Part[]): Promise<string> {
+export async function generateWithRetry(
+  ai: GoogleGenAI,
+  systemInstruction: string,
+  parts: Part[],
+  temperature = 0.1,
+): Promise<string> {
   const maxAttempts = 3;
   for (let attempt = 1; ; attempt++) {
     try {
@@ -128,7 +133,7 @@ async function generateWithRetry(ai: GoogleGenAI, systemInstruction: string, par
         config: {
           systemInstruction,
           responseMimeType: "application/json",
-          temperature: 0.1,
+          temperature,
         },
       });
       const text = response.text;
@@ -148,7 +153,7 @@ async function generateWithRetry(ai: GoogleGenAI, systemInstruction: string, par
   }
 }
 
-function parseJson(raw: string): unknown {
+export function parseJson(raw: string): unknown {
   const cleaned = raw
     .trim()
     .replace(/^```(?:json)?\s*/i, "")
