@@ -89,7 +89,8 @@ export class ScreeningError extends Error {
 }
 
 export function getClient(): GoogleGenAI {
-  const apiKey = process.env.GEMINI_API_KEY;
+  // Keys pasted into dashboards often pick up stray spaces or line breaks.
+  const apiKey = process.env.GEMINI_API_KEY?.replace(/\s+/g, "");
   if (!apiKey) throw new ScreeningError("GEMINI_API_KEY is not configured on the server.", 500);
   return new GoogleGenAI({ apiKey });
 }
@@ -146,7 +147,13 @@ export async function generateWithRetry(
         if (err instanceof ScreeningError) throw err;
         if (status === 401 || status === 403) throw new ScreeningError("Gemini rejected the API key.", 502);
         if (status === 429) throw new ScreeningError("Gemini rate limit hit. Try a smaller batch.", 429);
-        throw new ScreeningError(`Gemini request failed: ${(err as Error).message}`, 502);
+        if (status === 404) throw new ScreeningError(`Gemini model "${MODEL}" isn't available. Check GEMINI_MODEL.`, 502);
+        // SDK errors can echo request details (including the API key), so they stay in server logs only.
+        console.error("[gemini] request failed", status, err);
+        throw new ScreeningError(
+          status ? `Gemini request failed (HTTP ${status}).` : "Couldn't reach Gemini. Check the server's GEMINI_API_KEY and network.",
+          502,
+        );
       }
       await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt));
     }

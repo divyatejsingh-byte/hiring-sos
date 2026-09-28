@@ -13,7 +13,7 @@ const bodySchema = z.object({
 });
 
 export async function POST(req: Request) {
-  const apiKey = process.env.RESEND_API_KEY;
+  const apiKey = process.env.RESEND_API_KEY?.replace(/\s+/g, "");
   if (!apiKey) return error("RESEND_API_KEY is not configured on the server.", 500);
 
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
