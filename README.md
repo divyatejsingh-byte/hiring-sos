@@ -19,7 +19,7 @@ npm run dev                  # http://localhost:3000
 | `RESEND_REPLY_TO` | Optional reply-to address |
 | `NEXT_PUBLIC_COMPANY_NAME`, `NEXT_PUBLIC_SENDER_NAME` | Used in email templates |
 | `NEXT_PUBLIC_SCHEDULING_URL` | Optional booking link inserted into invites |
-| `APP_ACCESS_CODE` | Required in production. The shared code for `/login` |
+| `APP_ACCESS_CODE` | Optional. Set it to require a shared code at `/login`; leave unset for an open site |
 | `DATABASE_URL` | Neon Postgres connection string (pulled by `neon link`) |
 
 ## How it works
@@ -33,7 +33,7 @@ npm run dev                  # http://localhost:3000
 
 Candidates are stored in Neon Postgres (`src/lib/db.ts`, table `candidates`, created automatically on first use). They survive closing the browser and are shared across devices. Resume files themselves are never stored, only the screening result.
 
-The whole app sits behind a shared access code (`APP_ACCESS_CODE`). `src/proxy.ts` redirects signed-out visitors to `/login`, and every API route re-checks the cookie. In production an unset code locks the site rather than leaving it open.
+Sign-in is optional. With `APP_ACCESS_CODE` unset, the app is open to anyone with the URL, including stored candidate details and email sending. Set it to require a shared access code: `src/proxy.ts` then redirects signed-out visitors to `/login`, and every API route re-checks the cookie.
 
 ## Editing the rubric
 

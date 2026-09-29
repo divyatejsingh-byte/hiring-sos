@@ -7,10 +7,12 @@ function accessCode(): string | null {
   return process.env.APP_ACCESS_CODE?.trim() || null;
 }
 
-/** The gate is optional locally but mandatory in production: an unset code must never mean "open". */
+/**
+ * The gate is opt-in: set APP_ACCESS_CODE to require sign-in. With no code the app is open to anyone
+ * with the URL, including stored candidate data and email sending. That is a deliberate owner choice.
+ */
 export function authMode(): "enforced" | "disabled" | "misconfigured" {
-  if (accessCode()) return "enforced";
-  return process.env.NODE_ENV === "production" ? "misconfigured" : "disabled";
+  return accessCode() ? "enforced" : "disabled";
 }
 
 /** Cookie value: a hash of the code, so the code itself never sits in the browser. */
