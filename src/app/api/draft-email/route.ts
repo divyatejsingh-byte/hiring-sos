@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { requireAuth } from "@/lib/auth";
 import { generateWithRetry, getClient, parseJson, ScreeningError } from "@/lib/gemini";
 import { DIMENSION_LABELS } from "@/lib/scoring";
 import { ROLE_TITLES, type DimensionKey } from "@/lib/types";
@@ -61,6 +62,9 @@ TASK: a respectful rejection for the ${"{ROLE}"} role that includes short, const
 - 140-200 words total. Subject line under 70 characters and includes the role title and ${COMPANY}.`;
 
 export async function POST(req: Request) {
+  const denied = await requireAuth(req);
+  if (denied) return denied;
+
   const parsed = requestSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return error("Invalid draft request.", 400);
   const c = parsed.data;

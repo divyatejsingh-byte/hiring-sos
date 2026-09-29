@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Inbox, Plus, Search, Trash2 } from "lucide-react";
+import { AlertTriangle, Inbox, Loader2, Plus, RotateCw, Search, Trash2 } from "lucide-react";
 import { CandidateCard } from "@/components/CandidateCard";
 import { useHiring } from "@/components/HiringProvider";
 import { TIER_META, tierFor, type Tier } from "@/lib/scoring";
@@ -18,10 +18,11 @@ const STATUS_FILTERS: { value: CandidateStatus | "all"; label: string }[] = [
 ];
 
 export default function DashboardPage() {
-  const { candidates, hydrated, clearSession } = useHiring();
+  const { candidates, hydrated, loadError, reload, clearSession, notify } = useHiring();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<CandidateStatus | "all">("all");
   const [confirmClear, setConfirmClear] = useState(false);
+  const [clearing, setClearing] = useState(false);
 
   const statusCounts = useMemo(() => {
     const counts: Record<string, number> = { all: candidates.length };
@@ -44,7 +45,26 @@ export default function DashboardPage() {
     return TIERS.map((tier) => ({ tier, items: visible.filter((c) => tierFor(c.result.weighted_score) === tier) }));
   }, [candidates, query, status]);
 
-  if (!hydrated) return <main className="mx-auto max-w-7xl px-4 py-10" />;
+  if (!hydrated) {
+    return (
+      <main className="grid place-items-center px-4 py-24 text-muted">
+        <Loader2 className="size-6 animate-spin" />
+      </main>
+    );
+  }
+
+  if (loadError && candidates.length === 0) {
+    return (
+      <main className="mx-auto grid max-w-md place-items-center px-4 py-24 text-center">
+        <AlertTriangle className="size-10 text-amber-500" />
+        <h1 className="mt-3 text-lg font-semibold text-ink">Couldn&apos;t load your candidates</h1>
+        <p className="mt-1 text-sm text-muted">{loadError}</p>
+        <button onClick={() => void reload()} className="btn btn-outline mt-6">
+          <RotateCw className="size-4" /> Try again
+        </button>
+      </main>
+    );
+  }
 
   if (candidates.length === 0) {
     return (
@@ -77,23 +97,31 @@ export default function DashboardPage() {
         <div className="flex gap-2">
           {confirmClear ? (
             <div className="animate-fade-in flex items-center gap-2">
-              <span className="text-sm text-muted">Clear all?</span>
+              <span className="text-sm text-muted">Delete all {candidates.length} permanently?</span>
               <button onClick={() => setConfirmClear(false)} className="btn btn-ghost">
                 Cancel
               </button>
               <button
-                onClick={() => {
-                  clearSession();
-                  setConfirmClear(false);
+                disabled={clearing}
+                onClick={async () => {
+                  setClearing(true);
+                  try {
+                    await clearSession();
+                    setConfirmClear(false);
+                  } catch (err) {
+                    notify({ tone: "error", title: "Couldn't delete candidates", description: (err as Error).message });
+                  } finally {
+                    setClearing(false);
+                  }
                 }}
                 className="btn btn-reject"
               >
-                Clear
+                {clearing && <Loader2 className="size-4 animate-spin" />} Delete
               </button>
             </div>
           ) : (
-            <button onClick={() => setConfirmClear(true)} className="btn btn-ghost" title="Clear session">
-              <Trash2 className="size-4" /> <span className="hidden sm:inline">Clear</span>
+            <button onClick={() => setConfirmClear(true)} className="btn btn-ghost" title="Delete all candidates">
+              <Trash2 className="size-4" /> <span className="hidden sm:inline">Delete all</span>
             </button>
           )}
           <Link href="/" className="btn btn-primary">

@@ -1,11 +1,10 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import type { Candidate, CandidateStatus, EmailKind, Role, ScreeningResult } from "@/lib/types";
+import type { Candidate, CandidateStatus, EmailKind, Role } from "@/lib/types";
 import { EmailModal } from "./EmailModal";
 import { Toaster, type Toast } from "./Toaster";
 
-const STORAGE_KEY = "hiring-sos:candidates:v1";
 const CONCURRENCY = 3;
 
 export type JobState = "queued" | "processing" | "done" | "error";
@@ -20,11 +19,13 @@ export interface ScreeningJob {
 
 interface HiringContextValue {
   hydrated: boolean;
+  loadError: string | null;
+  reload: () => Promise<void>;
   candidates: Candidate[];
   getCandidate: (id: string) => Candidate | undefined;
   setStatus: (id: string, status: CandidateStatus) => void;
   markReviewPending: (id: string) => void;
-  clearSession: () => void;
+  clearSession: () => Promise<void>;
 
   jobs: ScreeningJob[];
   isScreening: boolean;
@@ -55,25 +56,38 @@ export function HiringProvider({ children }: { children: React.ReactNode }) {
   // Files can't be serialised, so retries read them from memory.
   const pendingFiles = useRef(new Map<string, { file: File; role: Role }>());
 
-  // --- session persistence -------------------------------------------------
-  useEffect(() => {
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  // --- server persistence ---------------------------------------------------
+  const reload = useCallback(async () => {
     try {
-      const raw = sessionStorage.getItem(STORAGE_KEY);
-      if (raw) setCandidates(JSON.parse(raw));
-    } catch {
-      /* storage unavailable or corrupt: start fresh */
+      const res = await fetch("/api/candidates", { cache: "no-store" });
+      if (res.status === 401) {
+        window.location.href = `/login?next=${encodeURIComponent(window.location.pathname)}`;
+        return;
+      }
+      const data = (await res.json().catch(() => ({}))) as { candidates?: Candidate[]; error?: string };
+      if (!res.ok || !data.candidates) throw new Error(data.error || `Couldn't load candidates (${res.status})`);
+      setCandidates(data.candidates);
+      setLoadError(null);
+    } catch (err) {
+      setLoadError((err as Error).message);
+    } finally {
+      setHydrated(true);
     }
-    setHydrated(true);
   }, []);
 
   useEffect(() => {
-    if (!hydrated) return;
-    try {
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(candidates));
-    } catch {
-      /* quota or private mode: state still lives in memory */
+    if (window.location.pathname.startsWith("/login")) {
+      setHydrated(true);
+      return;
     }
-  }, [candidates, hydrated]);
+    void reload();
+    // Pick up changes made on another device or tab when the founder comes back.
+    const onVisible = () => document.visibilityState === "visible" && void reload();
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [reload]);
 
   // --- candidates ----------------------------------------------------------
   const getCandidate = useCallback((id: string) => candidates.find((c) => c.id === id), [candidates]);
@@ -85,9 +99,22 @@ export function HiringProvider({ children }: { children: React.ReactNode }) {
   const markReviewPending = useCallback((id: string) => {
     // Never downgrade a candidate who has already been emailed.
     setCandidates((prev) => prev.map((c) => (c.id === id && c.status === "new" ? { ...c, status: "review_pending" } : c)));
+    // The server applies the same "only if new" rule, so this is safe to send unconditionally.
+    void fetch(`/api/candidates/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "review" }),
+    }).catch(() => {
+      /* non-critical: the badge resyncs on the next load */
+    });
   }, []);
 
-  const clearSession = useCallback(() => {
+  const clearSession = useCallback(async () => {
+    const res = await fetch("/api/candidates", { method: "DELETE" });
+    if (!res.ok) {
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      throw new Error(data.error || "Couldn't delete candidates.");
+    }
     setCandidates([]);
     setJobs([]);
     pendingFiles.current.clear();
@@ -117,18 +144,11 @@ export function HiringProvider({ children }: { children: React.ReactNode }) {
 
       try {
         const res = await fetch("/api/screen", { method: "POST", body: form });
-        const data = (await res.json().catch(() => ({}))) as { result?: ScreeningResult; error?: string };
-        if (!res.ok || !data.result) throw new Error(data.error || `Screening failed (${res.status})`);
+        const data = (await res.json().catch(() => ({}))) as { candidate?: Candidate; error?: string };
+        if (!res.ok || !data.candidate) throw new Error(data.error || `Screening failed (${res.status})`);
 
-        const candidate: Candidate = {
-          id: uid(),
-          fileName: entry.file.name,
-          role: entry.role,
-          screenedAt: new Date().toISOString(),
-          status: "new",
-          result: data.result,
-        };
-        setCandidates((prev) => [...prev, candidate]);
+        const candidate = data.candidate; // already saved server-side
+        setCandidates((prev) => [...prev.filter((c) => c.id !== candidate.id), candidate]);
         pendingFiles.current.delete(jobId);
         patchJob(jobId, { state: "done", candidateId: candidate.id });
       } catch (err) {
@@ -168,6 +188,8 @@ export function HiringProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<HiringContextValue>(
     () => ({
       hydrated,
+      loadError,
+      reload,
       candidates,
       getCandidate,
       setStatus,
@@ -181,7 +203,7 @@ export function HiringProvider({ children }: { children: React.ReactNode }) {
       openEmail,
       notify,
     }),
-    [hydrated, candidates, getCandidate, setStatus, markReviewPending, clearSession, jobs, isScreening, screenBatch, retryJob, dismissJobs, openEmail, notify],
+    [hydrated, loadError, reload, candidates, getCandidate, setStatus, markReviewPending, clearSession, jobs, isScreening, screenBatch, retryJob, dismissJobs, openEmail, notify],
   );
 
   return (

@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { requireAuth } from "@/lib/auth";
+import { insertCandidate } from "@/lib/db";
 import { ScreeningError, screenResume, type ResumeInput } from "@/lib/gemini";
 import { detectKind, extractResumeText, MAX_FILE_BYTES } from "@/lib/parse-resume";
 import type { Role } from "@/lib/types";
@@ -8,6 +10,9 @@ export const maxDuration = 60;
 
 /** Screens a single resume. The client fans out one request per file so results stream in as they finish. */
 export async function POST(req: Request) {
+  const denied = await requireAuth(req);
+  if (denied) return denied;
+
   let form: FormData;
   try {
     form = await req.formData();
@@ -47,7 +52,13 @@ export async function POST(req: Request) {
     }
 
     const result = await screenResume(input, role as Role, file.name);
-    return NextResponse.json({ result });
+    try {
+      const candidate = await insertCandidate({ fileName: file.name, role: role as Role, result });
+      return NextResponse.json({ candidate });
+    } catch (dbErr) {
+      console.error("[screen] couldn't save candidate", dbErr);
+      return error("Screened, but couldn't save to the database. Check DATABASE_URL and retry.", 500);
+    }
   } catch (err) {
     if (err instanceof ScreeningError) return error(err.message, err.status);
     console.error("[screen] unexpected error", err);

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { z } from "zod";
+import { requireAuth } from "@/lib/auth";
+import { updateStatus } from "@/lib/db";
 
 export const runtime = "nodejs";
 
@@ -9,10 +11,13 @@ const bodySchema = z.object({
   subject: z.string().trim().min(1, "Subject is required.").max(200),
   body: z.string().trim().min(1, "Message body is required.").max(20_000),
   kind: z.enum(["invite", "rejection"]),
-  candidateId: z.string().min(1),
+  candidateId: z.uuid(),
 });
 
 export async function POST(req: Request) {
+  const denied = await requireAuth(req);
+  if (denied) return denied;
+
   const apiKey = process.env.RESEND_API_KEY?.replace(/\s+/g, "");
   if (!apiKey) return error("RESEND_API_KEY is not configured on the server.", 500);
 
@@ -39,7 +44,16 @@ export async function POST(req: Request) {
     return error(sendError.message || "Resend could not send the email.", 502);
   }
 
-  return NextResponse.json({ id: data?.id });
+  // The email is out; record it. A failure here must not look like a failed send.
+  let statusSaved = true;
+  try {
+    await updateStatus(candidateId, kind === "invite" ? "invited" : "rejected");
+  } catch (dbErr) {
+    statusSaved = false;
+    console.error("[send-email] sent, but couldn't save status", dbErr);
+  }
+
+  return NextResponse.json({ id: data?.id, statusSaved });
 }
 
 function toHtml(text: string): string {

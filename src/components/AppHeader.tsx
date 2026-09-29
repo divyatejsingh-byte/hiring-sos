@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutGrid, LifeBuoy, Upload } from "lucide-react";
+import { LayoutGrid, LifeBuoy, LogOut, Upload } from "lucide-react";
 import { useHiring } from "./HiringProvider";
 
 export function AppHeader() {
@@ -32,10 +32,23 @@ export function AppHeader() {
           </span>
           Hiring SOS
         </Link>
-        <nav className="flex items-center gap-1">
-          {tab("/", "Screen", Upload, pathname === "/")}
-          {tab("/dashboard", "Candidates", LayoutGrid, pathname !== "/", count)}
-        </nav>
+        {!pathname.startsWith("/login") && (
+          <nav className="flex items-center gap-1">
+            {tab("/", "Screen", Upload, pathname === "/")}
+            {tab("/dashboard", "Candidates", LayoutGrid, pathname !== "/", count)}
+            <button
+              onClick={async () => {
+                await fetch("/api/logout", { method: "POST" }).catch(() => {});
+                window.location.href = "/login";
+              }}
+              className="ml-1 inline-flex items-center rounded-lg p-2 text-muted transition hover:bg-canvas hover:text-ink"
+              title="Sign out"
+              aria-label="Sign out"
+            >
+              <LogOut className="size-4" />
+            </button>
+          </nav>
+        )}
       </div>
     </header>
   );

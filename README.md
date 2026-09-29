@@ -19,6 +19,8 @@ npm run dev                  # http://localhost:3000
 | `RESEND_REPLY_TO` | Optional reply-to address |
 | `NEXT_PUBLIC_COMPANY_NAME`, `NEXT_PUBLIC_SENDER_NAME` | Used in email templates |
 | `NEXT_PUBLIC_SCHEDULING_URL` | Optional booking link inserted into invites |
+| `APP_ACCESS_CODE` | Required in production. The shared code for `/login` |
+| `DATABASE_URL` | Neon Postgres connection string (pulled by `neon link`) |
 
 ## How it works
 
@@ -29,7 +31,9 @@ npm run dev                  # http://localhost:3000
 5. **`/api/draft-email`**: when the email window opens, Gemini writes a personalised draft from the candidate's screening results. Invites mention what stood out. Rejections include 2–3 short, kind feedback points drawn from their gaps, with no scores or internal rubric language. The founder can edit it, click **Regenerate**, or switch to the basic template in `src/lib/email-templates.ts`, which is also the fallback if drafting fails.
 6. **`/api/send-email`**: sends the final text through Resend and flips the status to **Invited** or **Rejected** everywhere.
 
-Candidate state lives in `sessionStorage` (`src/components/HiringProvider.tsx`). It survives reloads and navigation within the tab and clears when the tab closes. No resume data is stored on the server.
+Candidates are stored in Neon Postgres (`src/lib/db.ts`, table `candidates`, created automatically on first use). They survive closing the browser and are shared across devices. Resume files themselves are never stored, only the screening result.
+
+The whole app sits behind a shared access code (`APP_ACCESS_CODE`). `src/proxy.ts` redirects signed-out visitors to `/login`, and every API route re-checks the cookie. In production an unset code locks the site rather than leaving it open.
 
 ## Editing the rubric
 
