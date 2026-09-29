@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
-@custom-variant dark (@media (prefers-color-scheme: dark));
+/* Theme is driven by <html data-theme>, set before first paint in layout.tsx. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 :root {
   --canvas: #f6f7f9;
@@ -10,18 +11,18 @@
   --line: #e2e8f0;
   --brand: #4f46e5;
   --brand-ink: #ffffff;
+  color-scheme: light;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --canvas: #0b0f17;
-    --surface: #121826;
-    --ink: #e5e9f0;
-    --muted: #8b95a7;
-    --line: #232b3b;
-    --brand: #818cf8;
-    --brand-ink: #0b0f17;
-  }
+:root[data-theme="dark"] {
+  --canvas: #0b0f17;
+  --surface: #121826;
+  --ink: #e5e9f0;
+  --muted: #8b95a7;
+  --line: #232b3b;
+  --brand: #818cf8;
+  --brand-ink: #0b0f17;
+  color-scheme: dark;
 }
 
 @theme inline {

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LayoutGrid, LifeBuoy, Upload } from "lucide-react";
 import { useHiring } from "./HiringProvider";
+import { ThemeToggle } from "./ThemeToggle";
 
 export function AppHeader() {
   const pathname = usePathname();
@@ -32,12 +33,15 @@ export function AppHeader() {
           </span>
           Hiring SOS
         </Link>
-        {!pathname.startsWith("/login") && (
-          <nav className="flex items-center gap-1">
-            {tab("/", "Screen", Upload, pathname === "/")}
-            {tab("/dashboard", "Candidates", LayoutGrid, pathname !== "/", count)}
-          </nav>
-        )}
+        <div className="flex items-center gap-1">
+          {!pathname.startsWith("/login") && (
+            <nav className="flex items-center gap-1">
+              {tab("/", "Screen", Upload, pathname === "/")}
+              {tab("/dashboard", "Candidates", LayoutGrid, pathname !== "/", count)}
+            </nav>
+          )}
+          <ThemeToggle />
+        </div>
       </div>
     </header>
   );
