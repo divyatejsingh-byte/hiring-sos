@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
   // Ensure rubric.txt ships with the serverless function on platforms like Vercel.
   outputFileTracingIncludes: {
     "/api/screen": ["./rubric.txt"],
+    "/rubric": ["./rubric.txt"],
   },
 };
 

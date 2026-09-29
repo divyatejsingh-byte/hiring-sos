@@ -2,13 +2,27 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, Inbox, Loader2, Plus, RotateCw, Search, Trash2 } from "lucide-react";
+import { AlertTriangle, CalendarCheck, Eye, Inbox, Loader2, MailX, Plus, RotateCw, Search, Sparkles, Trash2 } from "lucide-react";
 import { CandidateCard } from "@/components/CandidateCard";
 import { useHiring } from "@/components/HiringProvider";
 import { TIER_META, tierFor, type Tier } from "@/lib/scoring";
 import type { CandidateStatus } from "@/lib/types";
 
 const TIERS: Tier[] = ["strong", "borderline", "weak"];
+const PIPELINE: {
+  status: CandidateStatus;
+  label: string;
+  hint: string;
+  Icon: typeof Inbox;
+  tone: string;
+  bar: string;
+}[] = [
+  { status: "invited", label: "Invites sent", hint: "Interview invitation emailed", Icon: CalendarCheck, tone: "text-emerald-600 dark:text-emerald-400", bar: "bg-emerald-500" },
+  { status: "review_pending", label: "Under review", hint: "Opened, no email sent yet", Icon: Eye, tone: "text-violet-600 dark:text-violet-400", bar: "bg-violet-500" },
+  { status: "rejected", label: "Rejections sent", hint: "Rejection email sent", Icon: MailX, tone: "text-rose-600 dark:text-rose-400", bar: "bg-rose-500" },
+  { status: "new", label: "Not opened yet", hint: "Screened, waiting for you", Icon: Sparkles, tone: "text-sky-600 dark:text-sky-400", bar: "bg-sky-500" },
+];
+
 const STATUS_FILTERS: { value: CandidateStatus | "all"; label: string }[] = [
   { value: "all", label: "All" },
   { value: "new", label: "New" },
@@ -130,8 +144,50 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* Pipeline: where every candidate stands */}
+      <section className="card mt-6 p-4 sm:p-5" aria-label="Pipeline">
+        <div className="flex items-baseline justify-between gap-2">
+          <h2 className="text-sm font-semibold text-ink">Pipeline</h2>
+          <span className="text-xs text-muted tabular-nums">{candidates.length} screened</span>
+        </div>
+        <div className="mt-3 flex h-2 overflow-hidden rounded-full bg-canvas" role="img" aria-label="Share of candidates in each stage">
+          {PIPELINE.map((p) => {
+            const n = statusCounts[p.status] ?? 0;
+            return n ? (
+              <span key={p.status} className={`${p.bar} transition-[width] duration-500`} style={{ width: `${(n / candidates.length) * 100}%` }} />
+            ) : null;
+          })}
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {PIPELINE.map((p) => {
+            const n = statusCounts[p.status] ?? 0;
+            const active = status === p.status;
+            return (
+              <button
+                key={p.status}
+                onClick={() => setStatus(active ? "all" : p.status)}
+                aria-pressed={active}
+                title={active ? "Show all candidates" : `Show only: ${p.label.toLowerCase()}`}
+                className={`flex items-start gap-3 rounded-xl border p-3 text-left transition active:scale-[0.98] ${
+                  active ? "border-ink/30 bg-canvas" : "border-line hover:bg-canvas"
+                }`}
+              >
+                <span className={`mt-0.5 ${p.tone}`}>
+                  <p.Icon className="size-5" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-2xl leading-none font-semibold text-ink tabular-nums">{n}</span>
+                  <span className={`mt-1 block text-xs font-semibold ${p.tone}`}>{p.label}</span>
+                  <span className="hidden text-xs text-muted sm:block">{p.hint}</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
       {/* Fit summary */}
-      <div className="mt-6 grid grid-cols-3 gap-3">
+      <div className="mt-4 grid grid-cols-3 gap-3">
         {TIERS.map((t, i) => {
           const m = TIER_META[t];
           return (

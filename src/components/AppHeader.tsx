@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutGrid, LifeBuoy, Upload } from "lucide-react";
+import { LayoutGrid, LifeBuoy, ListChecks, Upload } from "lucide-react";
 import { useHiring } from "./HiringProvider";
 import { ThemeToggle } from "./ThemeToggle";
 
@@ -37,7 +37,8 @@ export function AppHeader() {
           {!pathname.startsWith("/login") && (
             <nav className="flex items-center gap-1">
               {tab("/", "Screen", Upload, pathname === "/")}
-              {tab("/dashboard", "Candidates", LayoutGrid, pathname !== "/", count)}
+              {tab("/dashboard", "Candidates", LayoutGrid, pathname.startsWith("/dashboard") || pathname.startsWith("/candidates"), count)}
+              {tab("/rubric", "Rubric", ListChecks, pathname.startsWith("/rubric"))}
             </nav>
           )}
           <ThemeToggle />
