@@ -2,9 +2,10 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, CalendarCheck, Eye, Inbox, Loader2, MailX, Plus, RotateCw, Search, Sparkles, Trash2 } from "lucide-react";
+import { AlertTriangle, CalendarCheck, Download, Eye, Inbox, Loader2, MailX, Plus, RotateCw, Search, Sparkles, Trash2 } from "lucide-react";
 import { CandidateCard } from "@/components/CandidateCard";
 import { useHiring } from "@/components/HiringProvider";
+import { candidatesToCsv, downloadCsv } from "@/lib/csv";
 import { TIER_META, tierFor, type Tier } from "@/lib/scoring";
 import type { CandidateStatus } from "@/lib/types";
 
@@ -109,6 +110,21 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <button
+            onClick={() => {
+              const visible = grouped.flatMap((g) => g.items);
+              if (!visible.length) {
+                notify({ tone: "error", title: "Nothing to export", description: "No candidates match the current filters." });
+                return;
+              }
+              downloadCsv(`hiring-sos-candidates-${new Date().toISOString().slice(0, 10)}.csv`, candidatesToCsv(visible));
+              notify({ tone: "success", title: `Exported ${visible.length} candidate${visible.length === 1 ? "" : "s"}`, description: "Saved to your Downloads folder" });
+            }}
+            className="btn btn-outline"
+            title="Download the candidates shown below as a CSV spreadsheet"
+          >
+            <Download className="size-4" /> <span className="hidden sm:inline">Export CSV</span>
+          </button>
           {confirmClear ? (
             <div className="animate-fade-in flex items-center gap-2">
               <span className="text-sm text-muted">Delete all {candidates.length} permanently?</span>
